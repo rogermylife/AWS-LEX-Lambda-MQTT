@@ -38,7 +38,7 @@ def try_ex(func):
         return None
 
 def isvalid_action(action):
-    valid_actions = ['back','next','louder','smaller']
+    valid_actions = ['back','next','louder','smaller','power']
     return action.lower() in valid_actions
 
 def build_validation_result(isvalid,violated_slot,message_content):
