@@ -5,6 +5,7 @@ import os
 import dateutil.parser
 import logging
 import boto3
+import urllib2
 
 logger = logging.getLogger()
 logger.setLevel(logging.DEBUG)
@@ -181,6 +182,65 @@ def turn(intent_request):
         }
     )
 
+def watch(intent_request):
+    show = try_ex(lambda: intent_request['currentIntent']['slots']['Show'])
+    session_attributes = intent_request['sessionAttributes'] if intent_request['sessionAttributes'] is not None else {}
+    reservation = json.dumps({
+        'ReservationType': 'Type',
+        'Show': show
+    })
+    session_attributes['currentReservation'] = reservation
+    if intent_request['invocationSource'] == 'DialogCodeHook':
+
+        session_attributes['currentReservation'] = reservation
+        return delegate(session_attributes, intent_request['currentIntent']['slots'])
+    
+    #  In a real application, this would likely involve a call to a backend service.
+    logger.debug('Watch under={}'.format(reservation))
+
+    try_ex(lambda: session_attributes.pop('currentReservation'))
+    session_attributes['lastConfirmedReservation'] = reservation
+    print "SHOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOW" + show
+    data = {
+        'q': show
+    }
+
+    req = urllib2.Request('https://fpe50kpobl.execute-api.us-east-1.amazonaws.com/zzzz')
+    req.add_header('Content-Type', 'application/json')
+    response = urllib2.urlopen(req, json.dumps(data))
+    data = json.loads(response.read())
+    channel_number =''
+    try:
+        channel_number = data['body-json']['errorMessage']
+        print "MMMMMMMMMMMMMMMMMMMMMMMMMMMM  ",channel_number
+        if channel_number.isnumeric():
+            # Change topic, qos and payload
+            response = client.publish(
+                    topic='PiInput',
+                    qos=1,
+                    payload=json.dumps({
+                        "Method":"Turn",
+                        "ChannelNumber" : channel_number
+                    })
+                )
+            responseContent = 'Done channel for '+show+' '+channel_number
+        else :
+            responseContent = 'Sorry! There is no '+show+' for you.'+channel_number
+    except:
+        channel_number = 'null'
+        responseContent ='error'
+    
+    print 'WHAT'
+    return close(
+        session_attributes,
+        'Fulfilled',
+        {
+            'contentType': 'PlainText',
+            'content': responseContent
+        }
+    )
+
+
 
 
 def dispatch(intent_request):
@@ -191,6 +251,8 @@ def dispatch(intent_request):
         return remote(intent_request)
     elif intent_name == 'Turn':
         return turn(intent_request)
+    elif intent_name == 'Watch':
+        return watch(intent_request)
 
     raise Exception('Intent with name ' + intent_name + ' not supported')
 
